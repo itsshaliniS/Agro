@@ -32,6 +32,54 @@ vector_store = None
 vector_backend = "none"
 retriever_cache = None
 
+NPK_BASELINES = {
+    "rice": {
+        "n": "100-120 kg/ha",
+        "p2o5": "40-60 kg/ha",
+        "k2o": "40-60 kg/ha",
+        "split": "N 3 splits (basal, tillering, panicle initiation); P and K mostly basal."
+    },
+    "wheat": {
+        "n": "120-150 kg/ha",
+        "p2o5": "50-60 kg/ha",
+        "k2o": "40-50 kg/ha",
+        "split": "N in 2-3 splits; P and K basal at sowing."
+    },
+    "maize": {
+        "n": "120-180 kg/ha",
+        "p2o5": "50-70 kg/ha",
+        "k2o": "40-60 kg/ha",
+        "split": "N in 2-3 splits; P and K at planting."
+    },
+}
+
+
+def _is_npk_query(query: str) -> bool:
+    q = query.lower()
+    return "npk" in q or "nitrogen" in q or "phosph" in q or "potash" in q
+
+
+def _extract_crop_name(query: str, history: list) -> str | None:
+    known = set(NPK_BASELINES.keys())
+    combined = [str(query or "")] + [str((m or {}).get("human", "")) for m in history[-8:]]
+    text = " ".join(combined).lower()
+    for crop in known:
+        if re.search(rf"\b{re.escape(crop)}\b", text):
+            return crop
+    return None
+
+
+def _build_npk_direct_answer(query: str, history: list) -> str:
+    crop = _extract_crop_name(query, history) or "rice"
+    info = NPK_BASELINES.get(crop, NPK_BASELINES["rice"])
+    return (
+        f"Direct answer: {crop.title()} ke liye standard NPK recommendation per hectare: "
+        f"N = {info['n']}, P2O5 = {info['p2o5']}, K2O = {info['k2o']}. "
+        f"Application: {info['split']} "
+        "Agar soil test nahi hai to isi base dose se start karo, phir crop response dekhkar 10-15% adjust karo. "
+        "30 hectare ke liye total requirement nikalne ka formula: per-hectare dose x 30."
+    )
+
 
 def _extract_project_routes() -> list:
     app_file = os.path.join(os.path.dirname(__file__), "app.py")
@@ -205,6 +253,9 @@ YOUR RESPONSE RULES:
 3. If the question is outside farming, still answer it instead of refusing.
 4. If the user asks for a result, give the result first, then brief context.
 5. Avoid extra warnings or repeated disclaimers unless something is genuinely uncertain.
+6. Do not start a questionnaire flow. Give a complete one-shot answer first.
+7. Ask at most one short follow-up question only if essential data is missing.
+8. For NPK questions, provide a practical default N-P-K recommendation immediately with units and split schedule.
 
 YOUR EXPERTISE AREAS:
 - Crop recommendation (which crop for which soil, season, region)
@@ -244,6 +295,12 @@ def stream_chat_response(query: str, history: list):
         yield "data: [DONE]\n\n"
         return
 
+    if _is_npk_query(query):
+        answer = _build_npk_direct_answer(query, history)
+        yield f"data: {json.dumps({'token': answer})}\n\n"
+        yield "data: [DONE]\n\n"
+        return
+
     # --- WEATHER INJECTION: If query asks about weather, get real-time Open-Meteo data ---
     weather_context = ""
     weather_keywords = ["weather", "mausam", "baarish", "rain", "temperature", "tapman", "humidity"]
@@ -258,7 +315,7 @@ def stream_chat_response(query: str, history: list):
     llm = ChatOllama(
         model=OLLAMA_LLM_MODEL,
         base_url=OLLAMA_HOST,
-        temperature=0.4
+        temperature=0.2
     )
     
     retriever = get_retriever()

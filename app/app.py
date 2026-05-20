@@ -288,6 +288,9 @@ def run_crop_agent(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     data = np.array([[n_value, phos_value, pot_value, temp_value, hum_value, ph_value, rain_value]])
     model = load_crop_model()
+    if model is None:
+        result["message"] = "Crop model is not available."
+        return result
     prediction = model.predict(data)[0]
     result["status"] = "ok"
     result["data"] = {
@@ -1044,7 +1047,8 @@ def market_trends():
                 (filtered_df['commodity_key'] == row.get('commodity_key', '')) &
                 (filtered_df['state_key'] == row.get('state_key', ''))
             )
-            history_df = filtered_df.loc[history_mask, ['arrival_dt', 'modal_num']].dropna().sort_values(by='arrival_dt')
+            history_df_base = cast(pd.DataFrame, filtered_df.loc[history_mask, ['arrival_dt', 'modal_num']])
+            history_df = history_df_base.dropna().sort_values(by='arrival_dt')
 
             pct_change = 0.0
             if len(history_df) >= 2:
@@ -1245,7 +1249,8 @@ def crop_prediction():
         K = int(request.form['pottasium'])
         ph = float(request.form['ph'])
         rainfall = float(request.form['rainfall'])
-        city = request.form.get("city", "").strip()
+        city_value = request.form.get("city")
+        city = city_value.strip() if isinstance(city_value, str) else ""
         
         # 1. Fetch weather via utility with fallback
         temperature, humidity, is_fallback = weather_fetch(city)
@@ -1473,7 +1478,8 @@ def api_assistant():
                 "system_instruction": "You are 'Krishi Mitr' — the farmer's best friend. You ONLY answer questions about agriculture, farming, crops, soil, irrigation, diseases, fertilizers, livestock, weather-for-farming, and government farming schemes. If anyone asks about ANY non-agriculture topic (coding, math, politics, history, celebrities, general knowledge, etc.) you MUST politely refuse in Hinglish: 'Arre bhai, main toh sirf kheti-baadi ka expert hoon! Ye topic meri samajh se bahar hai.' Talk warmly like a farmer elder — use Hinglish naturally, be encouraging, use 'bhai'/'dost'. Keep answers practical and actionable. Do NOT use markdown formatting. Use plain text only."
             }
         )
-        reply = response.text.strip()
+        raw_reply = response.text
+        reply = raw_reply.strip() if isinstance(raw_reply, str) else ""
         
         # Log AI interaction
         mongo.log_activity(

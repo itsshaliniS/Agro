@@ -1,7 +1,7 @@
 import os
 import json
 import threading
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Protocol, TypeAlias
 
 try:
     from google import genai
@@ -14,6 +14,20 @@ from agents import (
 )
 from agents.base import AgentMemory
 
+
+class RunnableAgent(Protocol):
+    def run(self, payload: Dict[str, Any]) -> Dict[str, Any]: ...
+
+
+AgentInstance: TypeAlias = (
+    CropAgent
+    | FertilizerAgent
+    | DiseaseAgent
+    | YieldAgent
+    | SustainabilityAgent
+    | IrrigationAgent
+)
+
 class Orchestrator:
     """
     The Central Intelligence of Krishi Mitr.
@@ -22,7 +36,7 @@ class Orchestrator:
     
     def __init__(self):
         self.memory = AgentMemory()
-        self.agents = {
+        self.agents: Dict[str, Optional[AgentInstance]] = {
             "crop": None,
             "fertilizer": None,
             "disease": None,
@@ -38,7 +52,7 @@ class Orchestrator:
         else:
             self.gemini = None
 
-    def get_agent(self, agent_name: str):
+    def get_agent(self, agent_name: str) -> AgentInstance:
         if agent_name not in self.agents:
             raise ValueError(f"Unknown agent: {agent_name}")
         
@@ -50,7 +64,10 @@ class Orchestrator:
             elif agent_name == "sustainability": self.agents["sustainability"] = SustainabilityAgent()
             elif agent_name == "irrigation": self.agents["irrigation"] = IrrigationAgent()
         
-        return self.agents[agent_name]
+        agent = self.agents[agent_name]
+        if agent is None:
+            raise RuntimeError(f"Failed to initialize agent: {agent_name}")
+        return agent
 
     def dispatch(self, task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Routes the task to the correct agent and handles auto-triggering."""
@@ -98,7 +115,8 @@ class Orchestrator:
                 model='gemini-2.0-flash',
                 contents=prompt
             )
-            chosen_agent = response.text.strip().lower()
+            response_text = response.text
+            chosen_agent = response_text.strip().lower() if isinstance(response_text, str) else ""
             # Basic validation of chosen agent
             if chosen_agent not in self.agents:
                 chosen_agent = "crop" # Default
