@@ -1,17 +1,8 @@
 # Krishi Mitr: Agentic AI Smart Farming Ecosystem
 
 <div align="center">
-  <!-- Tractor Animation Logo (Lottie) -->
-  <!-- Replace the src URL with your actual repo's raw URL if different! -->
-  <lottie-player
-    src="https://raw.githubusercontent.com/itsshaliniS/Agro/main/app/static/images/Tractor.json"
-    background="transparent"
-    speed="1.2"
-    style="width: 250px; height: 250px;"
-    loop
-    autoplay>
-  </lottie-player>
-
+  <!-- Tractor SVG Logo -->
+  <img src="app/static/Tractor.svg" alt="Krishi Mitr Logo" width="250" height="250" />
 
   <br><br>
 
@@ -22,9 +13,6 @@
   <img src="https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python" alt="Python">
   <img src="https://img.shields.io/badge/UI-Glassmorphism-purple?style=for-the-badge&logo=css3" alt="UI">
 </div>
-
-<!-- Load Lottie Web Player -->
-<script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
 
 ---
 
